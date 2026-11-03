@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-K Analysis: AAPL vs MSFT</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b2430; --muted: #5d6877; --line: #e1e5ea;
+    --price: #1F4E79; --pn: #C55A11; --accent: #1F4E79; --band: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c; --card: #1b2129; --text: #e8ecf1; --muted: #9aa5b4; --line: #2c3541;
+      --price: #6fa8dc; --pn: #f0a066; --accent: #6fa8dc; --band: #232b35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 8px 18px;
+         border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: dark) { .tab[aria-selected="true"] { color: #0b1117; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+  .card h2 { font-size: 17px; margin: 0 0 4px; }
+  .card .note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .kpi .v { font-size: 22px; font-weight: 700; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+  thead th { font-weight: 600; background: var(--band); }
+  tr.band td { background: var(--band); font-weight: 700; text-align: left; }
+  tr.bold td { font-weight: 700; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; margin: 0 0 6px; }
+  .sw { display: inline-block; width: 22px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  svg .grid { stroke: var(--line); stroke-width: 1; }
+  .findings li { margin-bottom: 6px; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .tip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line);
+         padding: 6px 9px; border-radius: 8px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.15); display: none; }
+  .chartbox { position: relative; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>10-K Analysis: Apple vs. Microsoft</h1>
+  <p class="sub">Ten years of annual reports (10-Ks) turned into ratios, MD&amp;A sentiment and stock prices. All amounts in US dollars.</p>
+
+  <div class="tabs" role="tablist" aria-label="Company">
+    <button class="tab" role="tab" data-co="AAPL" aria-selected="true">AAPL</button>
+    <button class="tab" role="tab" data-co="MSFT" aria-selected="false">MSFT</button>
+  </div>
+
+  <div id="kpis" class="kpis"></div>
+
+  <section class="card">
+    <h2>Stock price vs. sentiment P/N ratio</h2>
+    <p class="note" id="chartnote"></p>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--price)"></span>Closing stock price ($ per share, left axis)</span>
+      <span><span class="sw" style="background:var(--pn)"></span>P/N ratio (positive / negative words, right axis)</span>
+    </div>
+    <div class="chartbox"><svg id="chart" viewBox="0 0 960 380" width="100%" role="img" aria-label="Line chart of stock price and P/N ratio"></svg><div class="tip" id="tip"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Financial ratios</h2>
+    <p class="note">One ratio per category, calculated from the extracted financial statements.</p>
+    <div class="scroll"><table id="ratios"></table></div>
+    <p class="note" style="margin-top:10px">Current ratio = current assets / current liabilities. Debt-to-equity = total liabilities / total shareholders' equity. Asset turnover = total revenue / year-end total assets. Net margin = net income / total revenue. Return on equity = net income / total shareholders' equity.</p>
+  </section>
+
+  <section class="card">
+    <h2>MD&amp;A sentiment (Loughran-McDonald dictionary)</h2>
+    <p class="note">Word counts after cleaning the MD&amp;A text. P/N ratio = positive words / negative words.</p>
+    <div class="scroll"><table id="sent"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>What the data shows</h2>
+    <ul class="findings" id="findings"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Additional analysis: net income returned to shareholders</h2>
+    <p class="note">What share of net income did Apple and Microsoft return to shareholders, and how did this change their shareholders' equity? Ten-year totals: Apple FY2016 to FY2025, Microsoft FY2017 to FY2026.</p>
+    <div class="scroll"><table id="dupont"></table></div>
+    <p class="note" style="margin-top:10px">Opening equity is from the prior-year column of each company's first 10-K.</p>
+    <p style="margin:12px 0 0">Apple returned $855.0 billion to shareholders, 112% of its $763.5 billion net income, and its equity fell from $119.4 billion to $73.7 billion. Microsoft returned $385.5 billion, 59% of its net income, and its equity grew about six times, from $72.0 billion to $442.4 billion. Large buybacks shrank Apple's equity, so the same net income looks like a much larger percentage. This is why Apple's return on equity (152%) is far higher than Microsoft's (30%), even though Microsoft has the higher net profit margin.</p>
+  </section>
+  <section class="card">
+    <h2>Conclusion</h2>
+    <p style="margin:0">This analysis compared Apple and Microsoft over ten years using financial ratios, MD&amp;A sentiment and stock prices. Based on the findings, Microsoft has the stronger financial position: its higher current ratio, lower debt and higher net profit margin leave it better able to meet its obligations. Apple's higher return on equity comes from debt and share buybacks rather than higher net income. MD&amp;A tone showed no relationship with either company's stock price, so financial ratios are a more reliable basis for comparison.</p>
+  </section>
+  <section class="card">
+    <h2>Source code</h2>
+    <p class="note">The Python programs that produced these results are in this repository, one file per stage: <code>stage_a_download_10k.py</code> (download), <code>stage_b_extract_mdna.py</code> (MD&amp;A), <code>stage_c_extract_financials.py</code> (statements), <code>stage_d_sentiment.py</code> (Loughran-McDonald scoring), <code>stage_e_stock_prices.py</code> (prices) and <code>stage_f_analysis.py</code> (ratios, summary and chart).</p>
+  </section>
+
+  <footer>Source: SEC EDGAR 10-K filings, extracted with Python (download, MD&amp;A and statement extraction, Loughran-McDonald scoring, Yahoo Finance prices). Figures are as originally reported; Apple's fiscal year ends in late September and Microsoft's on June 30; prices are split-adjusted, not dividend-adjusted. Correlations on ten points are suggestive only.</footer>
+</div>
+
+<script>
+const DATA = {
+  AAPL: {
+    name: "Apple Inc.",
+    dates: ["2016-09-24","2017-09-30","2018-09-29","2019-09-28","2020-09-26","2021-09-25","2022-09-24","2023-09-30","2024-09-28","2025-09-27"],
+    current: [1.35,1.28,1.12,1.54,1.36,1.07,0.88,0.99,0.87,0.89],
+    de:      [1.51,1.80,2.41,2.74,3.96,4.56,5.96,4.67,5.41,3.87],
+    turn:    [0.67,0.61,0.73,0.77,0.85,1.04,1.12,1.09,1.07,1.16],
+    margin:  [21.2,21.1,22.4,21.2,20.9,25.9,25.3,25.3,24.0,26.9],
+    roe:     [35.6,36.1,55.6,61.1,87.9,150.1,197.0,156.1,164.6,151.9],
+    total:   [8087,8272,7881,4552,4314,2497,2311,2044,2001,2358],
+    pos:     [25,25,35,9,6,13,6,1,3,5],
+    neg:     [107,110,84,47,56,14,26,16,17,20],
+    unc:     [126,132,123,69,62,31,25,23,22,30],
+    lit:     [65,60,61,30,23,14,13,13,13,14],
+    con:     [65,68,64,44,51,24,21,20,27,30],
+    strong:  [24,31,27,10,10,5,3,3,9,12],
+    weak:    [42,49,49,22,23,10,8,8,8,12],
+    price:   [28.18,38.53,56.44,54.71,112.28,146.92,150.43,171.21,227.79,255.46],
+    corr: -0.02,
+    findings: [
+      "Liquidity fell from 1.35 to 0.89 and has been below 1.0 every year since 2022.",
+      "Debt-to-equity rose from 1.51 to a peak of 5.96 in FY2022 and eased to 3.87 in FY2025.",
+      "Asset turnover improved from 0.67 to 1.16; net margin stayed in a 21-27% band.",
+      "Return on equity rose from 36% to over 150%, while shareholders' equity declined over the same period (see the share buyback section below).",
+      "Price rose from $28.18 to $255.46 while the P/N ratio zigzagged between 0.06 and 0.93 (average 0.28). The correlation is -0.02: no relationship.",
+      "The extracted MD&A word count falls from 8,087 to 2,358, which may be an extraction error. Single-year P/N values therefore rest on few words (FY2023: one positive word and 16 negative words), and the sentiment results should be read with caution."
+    ]
+  },
+  MSFT: {
+    name: "Microsoft Corporation",
+    dates: ["2017-06-30","2018-06-30","2019-06-30","2020-06-30","2021-06-30","2022-06-30","2023-06-30","2024-06-30","2025-06-30","2026-06-30"],
+    current: [2.48,2.90,2.53,2.52,2.08,1.78,1.77,1.27,1.35,1.23],
+    de:      [2.33,2.13,1.80,1.55,1.35,1.19,1.00,0.91,0.80,0.71],
+    turn:    [0.37,0.43,0.44,0.47,0.50,0.54,0.51,0.48,0.46,0.44],
+    margin:  [23.6,15.0,31.2,31.0,36.5,36.7,34.1,36.0,36.1,40.3],
+    roe:     [29.3,20.0,38.3,37.4,43.2,43.7,35.1,32.8,29.6,30.2],
+    total:   [9683,8969,8554,8998,7774,7681,7726,7131,6643,7040],
+    pos:     [52,49,52,58,52,44,38,27,28,51],
+    neg:     [175,124,82,75,63,53,81,65,62,73],
+    unc:     [97,71,78,89,66,71,72,71,62,62],
+    lit:     [48,51,47,41,48,44,44,44,33,33],
+    con:     [67,60,48,50,49,49,58,57,51,60],
+    strong:  [17,11,9,14,11,13,11,12,12,13],
+    weak:    [21,20,20,25,22,22,23,23,23,24],
+    price:   [68.93,98.61,133.96,203.51,270.90,256.83,340.54,446.95,497.41,373.02],
+    corr: 0.04,
+    findings: [
+      "Liquidity fell from 2.48 to 1.23 but stayed above 1.0 in every year.",
+      "Debt-to-equity fell from 2.33 to 0.71 as equity grew and debt was paid down.",
+      "Net margin rose from 24% to 40%, apart from a dip to 15.0% in FY2018 that reflects a one-time $13.7 billion charge from the 2017 Tax Cuts and Jobs Act. Return on equity ranged from 20% to 44%.",
+      "Price rose from $68.93 to a peak of $497.41 in FY2025, then closed at $373.02. P/N peaked at 0.83 in FY2021-22 and recovered to 0.70 in FY2026 (average 0.58). The correlation with price is 0.04: no relationship.",
+      "Microsoft's MD&A has a higher average P/N ratio than Apple's, and its word count fell about 27%, from 9,683 to 7,040, so its ratio is steadier."
+    ]
+  }
+};
+
+const $ = s => document.querySelector(s);
+const fmt = (n, d=2) => n.toLocaleString("en-US", {minimumFractionDigits:d, maximumFractionDigits:d});
+const usd = n => "$" + fmt(n);
+const pn = d => d.pos.map((p,i) => p / d.neg[i]);
+
+function renderKpis(d) {
+  const p = pn(d), last = d.price.length - 1;
+  const avg = p.reduce((a,b)=>a+b,0) / p.length;
+  const items = [
+    ["Price, first to last year", usd(d.price[0]) + " to " + usd(d.price[last])],
+    ["Average P/N ratio", fmt(avg)],
+    ["Correlation, price vs. P/N", fmt(d.corr)],
+    ["Net margin, latest year", fmt(d.margin[last],1) + "%"],
+    ["Return on equity, latest year", fmt(d.roe[last],1) + "%"]
+  ];
+  $("#kpis").innerHTML = items.map(([l,v]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+}
+
+function renderTable(id, d, rows) {
+  const head = "<thead><tr><th></th>" + d.dates.map(x => `<th>${x}</th>`).join("") + "</tr></thead>";
+  const body = rows.map(r => {
+    if (r.band) return `<tr class="band"><td colspan="${d.dates.length+1}">${r.band}</td></tr>`;
+    return `<tr class="${r.bold ? "bold" : ""}"><td>${r.label}</td>` + r.vals.map(v => `<td>${r.f(v)}</td>`).join("") + "</tr>";
+  }).join("");
+  $(id).innerHTML = head + "<tbody>" + body + "</tbody>";
+}
+
+function renderChart(d) {
+  const svg = $("#chart"), W = 960, H = 380, L = 70, R = 70, T = 14, B = 52;
+  const n = d.dates.length, p = pn(d);
+  const pMax = Math.ceil(Math.max(...d.price) / 100) * 100;
+  const qMax = Math.max(1, Math.ceil(Math.max(...p) * 10) / 10);
+  const x = i => L + (W - L - R) * i / (n - 1);
+  const yP = v => T + (H - T - B) * (1 - v / pMax);
+  const yQ = v => T + (H - T - B) * (1 - v / qMax);
+  let s = "";
+  for (let k = 0; k <= 5; k++) {
+    const y = T + (H - T - B) * k / 5;
+    s += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/>`;
+    s += `<text x="${L-8}" y="${y+4}" text-anchor="end">${"$" + fmt(pMax * (1 - k/5), 0)}</text>`;
+    s += `<text x="${W-R+8}" y="${y+4}">${fmt(qMax * (1 - k/5))}</text>`;
+  }
+  d.dates.forEach((dt, i) => { s += `<text x="${x(i)}" y="${H-B+18}" text-anchor="middle">${dt}</text>`; });
+  s += `<text x="${(L+W-R)/2}" y="${H-6}" text-anchor="middle">Balance sheet date</text>`;
+  s += `<text transform="translate(16 ${(T+H-B)/2}) rotate(-90)" text-anchor="middle">Closing price ($)</text>`;
+  s += `<text transform="translate(${W-12} ${(T+H-B)/2}) rotate(-90)" text-anchor="middle">P/N ratio</text>`;
+  const line = (arr, y, col) => `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${arr.map((v,i)=>x(i)+","+y(v)).join(" ")}"/>`;
+  s += line(d.price, yP, "var(--price)") + line(p, yQ, "var(--pn)");
+  d.price.forEach((v,i) => { s += `<circle cx="${x(i)}" cy="${yP(v)}" r="4" fill="var(--price)"/>`; });
+  p.forEach((v,i) => { s += `<rect x="${x(i)-4}" y="${yQ(v)-4}" width="8" height="8" transform="rotate(45 ${x(i)} ${yQ(v)})" fill="var(--pn)"/>`; });
+  d.dates.forEach((dt, i) => { s += `<rect class="hit" data-i="${i}" x="${x(i)-(W-L-R)/(n-1)/2}" y="${T}" width="${(W-L-R)/(n-1)}" height="${H-T-B}" fill="transparent"/>`; });
+  svg.innerHTML = s;
+  const tip = $("#tip"), box = svg.parentElement;
+  svg.querySelectorAll(".hit").forEach(r => {
+    r.addEventListener("mousemove", e => {
+      const i = +r.dataset.i, b = box.getBoundingClientRect();
+      tip.innerHTML = `<b>${d.dates[i]}</b><br>Price ${usd(d.price[i])}<br>P/N ${fmt(p[i])} (${d.pos[i]} pos / ${d.neg[i]} neg)`;
+      tip.style.display = "block";
+      tip.style.left = Math.min(e.clientX - b.left + 12, b.width - 170) + "px";
+      tip.style.top = (e.clientY - b.top + 12) + "px";
+    });
+    r.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+  $("#chartnote").textContent = d.name + ": correlation between price and P/N ratio is " + fmt(d.corr) + " over ten balance sheet dates.";
+}
+
+function renderDupont() {
+  const rows = [
+    ["Buybacks", "$713.2B", "$205.3B"],
+    ["Dividends", "$141.8B", "$180.2B"],
+    ["Share of net income returned", "112%", "59%"],
+    ["Equity", "$119.4B to $73.7B", "$72.0B to $442.4B"],
+    ["Total net income", "$763.5B", "$651.4B"],
+    ["Total returned", "$855.0B", "$385.5B"]
+  ];
+  $("#dupont").innerHTML = "<thead><tr><th>Measure</th><th>Apple</th><th>Microsoft</th></tr></thead><tbody>" +
+    rows.map((r,i) => `<tr class="${i===5 ? "bold" : ""}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("") + "</tbody>";
+}
+
+function show(co) {
+  const d = DATA[co];
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.co === co));
+  renderKpis(d);
+  renderChart(d);
+  const p = pn(d);
+  renderTable("#ratios", d, [
+    {band: "Financial ratios"},
+    {label: "Liquidity: Current Ratio", vals: d.current, f: v => fmt(v)},
+    {label: "Solvency: Debt-to-Equity", vals: d.de, f: v => fmt(v)},
+    {label: "Efficiency: Asset Turnover", vals: d.turn, f: v => fmt(v)},
+    {label: "Profitability: Net Profit Margin", vals: d.margin, f: v => fmt(v,1) + "%"},
+    {label: "Profitability: Return on Equity", vals: d.roe, f: v => fmt(v,1) + "%"}
+  ]);
+  renderTable("#sent", d, [
+    {label: "Total Word Count", vals: d.total, f: v => v.toLocaleString("en-US"), bold: true},
+    {label: "Positive Words", vals: d.pos, f: v => v},
+    {label: "Negative Words", vals: d.neg, f: v => v},
+    {label: "Uncertainty Words", vals: d.unc, f: v => v},
+    {label: "Litigious Words", vals: d.lit, f: v => v},
+    {label: "Constraining Words", vals: d.con, f: v => v},
+    {label: "Strong Modal Words", vals: d.strong, f: v => v},
+    {label: "Weak Modal Words", vals: d.weak, f: v => v},
+    {label: "P/N Ratio (Positive / Negative)", vals: p, f: v => fmt(v), bold: true},
+    {label: "Closing Stock Price ($ per share)", vals: d.price, f: v => usd(v)}
+  ]);
+  $("#findings").innerHTML = d.findings.map(t => `<li>${t}</li>`).join("");
+}
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => show(t.dataset.co)));
+renderDupont();
+show("AAPL");
+</script>
+</body>
+</html>
